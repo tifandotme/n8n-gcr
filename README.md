@@ -39,6 +39,14 @@ Before diving in, make sure you've got:
 
 The command line approach might seem intimidating at first, but it means we can script the entire deployment process. And when you need to update or recreate your instance, you'll thank yourself for having everything in a reusable format.
 
+## Community Video Walkthrough ##
+
+Massive thanks to Terra Femme for creating this brilliant step-by-step video walkthrough of the entire deployment process! If you're more of a visual learner or want to see someone actually troubleshoot the common gotchas in real-time, this is gold.
+
+▶️ [Watch the deployment video](https://youtu.be/bLDv07BR9Hw "Host n8n on Google Cloud RUN Free in Under 20 - @TerraFemme-Tech") by [Terra Femme (@terra.femme)](https://github.com/terra-femme "terra-femme (Terra.Femme").
+
+The video covers the full Terraform deployment using Google Cloud Shell Editor, including the port configuration fix that trips up most people. It's basically a live demo of everything in this guide, which is pretty awesome.
+
 ## Step 1: Set Up Your Google Cloud Project ##
 
 First, let's get our Google Cloud environment sorted:
