@@ -244,7 +244,7 @@ resource "google_cloud_run_v2_service" "n8n" {
       }
       env {
         name  = "N8N_USER_FOLDER"
-        value = "/home/node/.n8n"
+        value = "/home/node"
       }
       env {
         name  = "GENERIC_TIMEZONE"
