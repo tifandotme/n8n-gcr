@@ -235,6 +235,7 @@ gcloud run deploy n8n \
     --memory=2Gi \
     --min-instances=0 \
     --max-instances=1 \
+    --no-cpu-throttling \
     --set-env-vars="N8N_PATH=/,N8N_PORT=443,N8N_PROTOCOL=https,DB_TYPE=postgresdb,DB_POSTGRESDB_DATABASE=n8n,DB_POSTGRESDB_USER=n8n-user,DB_POSTGRESDB_HOST=/cloudsql/$SQL_CONNECTION,DB_POSTGRESDB_PORT=5432,DB_POSTGRESDB_SCHEMA=public,N8N_USER_FOLDER=/home/node,EXECUTIONS_PROCESS=main,EXECUTIONS_MODE=regular,GENERIC_TIMEZONE=UTC,QUEUE_HEALTH_CHECK_ACTIVE=true" \
     --set-secrets="DB_POSTGRESDB_PASSWORD=n8n-db-password:latest,N8N_ENCRYPTION_KEY=n8n-encryption-key:latest" \
     --add-cloudsql-instances=$SQL_CONNECTION \
@@ -243,7 +244,7 @@ gcloud run deploy n8n \
 
 After deployment, Cloud Run will provide a URL for your n8n instance. Note it down - you'll need it for the next steps.
 
-A word on the configuration: setting min-instances to 0 and max-instances to 1 means your service will scale down to nothing when not in use (saving you money) but won't run multiple instances simultaneously (which can cause database conflicts with n8n). The CPU and memory allocation is enough for most workflows without going overboard on cost.
+A word on the configuration: setting min-instances to 0 and max-instances to 1 means your service will scale down to nothing when not in use (saving you money) but won't run multiple instances simultaneously (which can cause database conflicts with n8n). The CPU and memory allocation is enough for most workflows without going overboard on cost. The CPU throttling setting allows for the n8n service to finish processing outside of request processing times, such as flushing data to the database.
 
 ### n8n Google Cloud Run Environment Variables ###
 
