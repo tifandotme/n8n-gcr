@@ -39,12 +39,13 @@ resource "google_project_service" "secretmanager" {
 }
 
 resource "google_project_service" "cloudresourcemanager" {
-  service            = "cloudresourcemanager.googleapis.com" # Added during manual deployment
+  service            = "cloudresourcemanager.googleapis.com"
   disable_on_destroy = false
 }
 
-# --- Artifact Registry --- #
+# --- Artifact Registry (Optional - only for custom image) --- #
 resource "google_artifact_registry_repository" "n8n_repo" {
+  count         = var.use_custom_image ? 1 : 0
   project       = var.gcp_project_id
   location      = var.gcp_region
   repository_id = var.artifact_repo_name
@@ -55,20 +56,20 @@ resource "google_artifact_registry_repository" "n8n_repo" {
 
 # --- Cloud SQL --- #
 resource "google_sql_database_instance" "n8n_db_instance" {
-  name             = "${var.cloud_run_service_name}-db" # Use service name prefix for uniqueness
+  name             = "${var.cloud_run_service_name}-db"
   project          = var.gcp_project_id
   region           = var.gcp_region
   database_version = "POSTGRES_13"
   settings {
     tier              = var.db_tier
-    availability_type = "ZONAL"  # Match guide
-    disk_type         = "PD_HDD" # Match guide
+    availability_type = "ZONAL"
+    disk_type         = "PD_HDD"
     disk_size         = var.db_storage_size
     backup_configuration {
-      enabled = false # Match guide
+      enabled = false
     }
   }
-  deletion_protection = false # Allow deletion in Terraform
+  deletion_protection = false
   depends_on          = [google_project_service.sqladmin]
 }
 
@@ -86,7 +87,6 @@ resource "google_sql_user" "n8n_user" {
 }
 
 # --- Secret Manager --- #
-# Generate a random password for the DB
 resource "random_password" "db_password" {
   length      = 16
   special     = true
@@ -114,11 +114,11 @@ resource "google_secret_manager_secret_version" "db_password_secret_version" {
   secret_data = random_password.db_password.result
 }
 
-# Secret Manager: n8n encryption key
 resource "random_password" "n8n_encryption_key" {
   length  = 32
   special = false
 }
+
 resource "google_secret_manager_secret" "encryption_key_secret" {
   secret_id = "${var.cloud_run_service_name}-encryption-key"
   project   = var.gcp_project_id
@@ -162,11 +162,14 @@ resource "google_project_iam_member" "sql_client" {
 
 # --- Cloud Run Service --- #
 locals {
-  # Construct the image name dynamically
-  n8n_image_name = "${var.gcp_region}-docker.pkg.dev/${var.gcp_project_id}/${var.artifact_repo_name}/${var.cloud_run_service_name}:latest"
-  # Construct the service URL dynamically for env vars
-  service_url  = "https://${var.cloud_run_service_name}-${google_project_service.run.project}.run.app" # Assuming default URL format
-  service_host = replace(local.service_url, "https://", "")
+  # Use official image or custom image based on variable
+  n8n_image = var.use_custom_image ? "${var.gcp_region}-docker.pkg.dev/${var.gcp_project_id}/${var.artifact_repo_name}/${var.cloud_run_service_name}:latest" : "docker.n8n.io/n8nio/n8n:latest"
+  
+  # Port configuration differs between options
+  n8n_port = var.use_custom_image ? "443" : "5678"
+  
+  # User folder differs between options
+  n8n_user_folder = var.use_custom_image ? "/home/node" : "/home/node/.n8n"
 }
 
 resource "google_cloud_run_v2_service" "n8n" {
@@ -174,13 +177,13 @@ resource "google_cloud_run_v2_service" "n8n" {
   location = var.gcp_region
   project  = var.gcp_project_id
 
-  ingress             = "INGRESS_TRAFFIC_ALL" # Allow unauthenticated
-  deletion_protection = false                 # Ensure this is false
+  ingress             = "INGRESS_TRAFFIC_ALL"
+  deletion_protection = false
 
   template {
     service_account = google_service_account.n8n_sa.email
     scaling {
-      max_instance_count = var.cloud_run_max_instances # Guide uses 1
+      max_instance_count = var.cloud_run_max_instances
       min_instance_count = 0
     }
     volumes {
@@ -190,7 +193,19 @@ resource "google_cloud_run_v2_service" "n8n" {
       }
     }
     containers {
-      image = local.n8n_image_name # IMPORTANT: Build and push this image manually first
+      image = local.n8n_image
+      
+      # Add command override for official image (Option A)
+      dynamic "args" {
+        for_each = var.use_custom_image ? [] : [1]
+        content {
+          args = ["-c", "sleep 5; n8n start"]
+        }
+      }
+      
+      # Set command for official image (Option A)
+      command = var.use_custom_image ? null : ["/bin/sh"]
+      
       volume_mounts {
         name       = "cloudsql"
         mount_path = "/cloudsql"
@@ -204,16 +219,21 @@ resource "google_cloud_run_v2_service" "n8n" {
           memory = var.cloud_run_memory
         }
         startup_cpu_boost = true
-        cpu_idle = false
+        cpu_idle          = false  # This is --no-cpu-throttling
       }
-      env {
-        name  = "N8N_PATH"
-        value = "/"
+      
+      # Only set N8N_PATH for custom image
+      dynamic "env" {
+        for_each = var.use_custom_image ? [1] : []
+        content {
+          name  = "N8N_PATH"
+          value = "/"
+        }
       }
       
       env {
         name  = "N8N_PORT"
-        value = "443"
+        value = local.n8n_port
       }
       env {
         name  = "N8N_PROTOCOL"
@@ -245,7 +265,7 @@ resource "google_cloud_run_v2_service" "n8n" {
       }
       env {
         name  = "N8N_USER_FOLDER"
-        value = "/home/node"
+        value = local.n8n_user_folder
       }
       env {
         name  = "GENERIC_TIMEZONE"
@@ -274,23 +294,15 @@ resource "google_cloud_run_v2_service" "n8n" {
         }
       }
       env {
-        name = "N8N_HOST"
-        # Construct hostname dynamically using project number and region
+        name  = "N8N_HOST"
         value = "${var.cloud_run_service_name}-${data.google_project.project.number}.${var.gcp_region}.run.app"
       }
       env {
-        name = "N8N_WEBHOOK_URL" # Deprecated but may be needed by older nodes/workflows
-        # Construct URL dynamically using project number and region
+        name  = "WEBHOOK_URL"
         value = "https://${var.cloud_run_service_name}-${data.google_project.project.number}.${var.gcp_region}.run.app"
       }
       env {
-        name = "N8N_EDITOR_BASE_URL"
-        # Construct URL dynamically using project number and region
-        value = "https://${var.cloud_run_service_name}-${data.google_project.project.number}.${var.gcp_region}.run.app"
-      }
-      env {
-        name = "WEBHOOK_URL" # Current version
-        # Construct URL dynamically using project number and region
+        name  = "N8N_EDITOR_BASE_URL"
         value = "https://${var.cloud_run_service_name}-${data.google_project.project.number}.${var.gcp_region}.run.app"
       }
       env {
@@ -298,39 +310,15 @@ resource "google_cloud_run_v2_service" "n8n" {
         value = "true"
       }
       env {
-        name  = "N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS"
-        value = "true"
-      }
-      env {
-        name  = "N8N_DIAGNOSTICS_ENABLED"
-        value = "false"
-      }
-      env {
-        name  = "DB_POSTGRESDB_CONNECTION_TIMEOUT"
-        value = "60000"
-      }
-      env {
-        name  = "DB_POSTGRESDB_ACQUIRE_TIMEOUT"
-        value = "60000"
-      }
-      env {
-        name  = "EXECUTIONS_PROCESS" # Added from GitHub issue solution
-        value = "main"
-      }
-      env {
-        name  = "EXECUTIONS_MODE" # Added from GitHub issue solution
-        value = "regular"
-      }
-      env {
-        name  = "N8N_LOG_LEVEL" # Added from GitHub issue solution
-        value = "debug"
+        name  = "N8N_PROXY_HOPS"
+        value = "1"
       }
 
       startup_probe {
-        initial_delay_seconds = 120 # Added from GitHub issue solution
+        initial_delay_seconds = 30
         timeout_seconds       = 240
-        period_seconds        = 10 # Reduced period for faster checks
-        failure_threshold     = 3  # Standard threshold
+        period_seconds        = 10
+        failure_threshold     = 3
         tcp_socket {
           port = var.cloud_run_container_port
         }
@@ -347,12 +335,10 @@ resource "google_cloud_run_v2_service" "n8n" {
     google_project_service.run,
     google_project_iam_member.sql_client,
     google_secret_manager_secret_iam_member.db_password_secret_accessor,
-    google_secret_manager_secret_iam_member.encryption_key_secret_accessor,
-    google_artifact_registry_repository.n8n_repo
+    google_secret_manager_secret_iam_member.encryption_key_secret_accessor
   ]
 }
 
-# Grant public access to the Cloud Run service
 resource "google_cloud_run_v2_service_iam_member" "n8n_public_invoker" {
   project  = google_cloud_run_v2_service.n8n.project
   location = google_cloud_run_v2_service.n8n.location

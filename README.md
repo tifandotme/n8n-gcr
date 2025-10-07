@@ -617,10 +617,26 @@ Review the planned changes
 terraform plan
 ```
 
-Deploy the infrastructure
+Deploy the infrastructure.
+
+**For Option A (recommended - official image):**
+
 
 ```tf
 terraform apply
+```
+
+**For Option B (custom image):**
+
+
+```tf
+terraform apply -var="use_custom_image=true"
+```
+
+Or in `terraform.tfvars`:
+
+```hcl
+use_custom_image = true  # Only if you want custom image
 ```
 
 ### Terraform Troubleshooting ###
