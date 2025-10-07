@@ -35,6 +35,8 @@ Before diving in, make sure you've got:
 
 * Basic familiarity with Docker and command line
 
+  **Docker** (only needed if using custom image - Option B)
+
 * A domain name (optional, but recommended for production use)
 
 The command line approach might seem intimidating at first, but it means we can script the entire deployment process. And when you need to update or recreate your instance, you'll thank yourself for having everything in a reusable format.
@@ -71,9 +73,19 @@ gcloud services enable secretmanager.googleapis.com
 
 These commands establish your project environment and enable the necessary Google Cloud APIs. We're turning on all the services we'll need upfront to avoid those annoying "please enable this API first" errors later.
 
-## Step 2: Create a Custom Dockerfile and Startup Script for n8n ##
+## Step 2: Prepare n8n for Cloud Run Deployment ##
 
-Here's where things get interesting. Cloud Run and n8n have a bit of a disagreement about ports - one expects containers to use a specific `PORT` environment variable, while n8n uses its own system. We need to bridge that gap.
+n8n needs a small startup delay when connecting to external databases to avoid a race condition during initialisation. There are two ways to handle this:
+
+### Option A: Using the Official Image (Recommended)
+
+This is the simplest approach - use n8n's official Docker image with a command override to add a 5-second startup delay. This pattern comes from [n8n's own Kubernetes deployments](https://github.com/n8n-io/n8n-hosting/blob/main/kubernetes/n8n-deployment.yaml#L32) and works perfectly on Cloud Run.
+
+**No additional files needed!** You'll use command overrides when deploying (covered in Step 7).
+
+### Option B: Custom Docker Image (Advanced)
+
+If you need custom startup logic or want detailed debugging output, use a custom Docker image. This approach gives you more control but requires building and maintaining your own image.
 
 Create these two files in your working directory:
 
@@ -82,9 +94,15 @@ Create these two files in your working directory:
 ```bash
 #!/bin/sh
 
+# Add startup delay for database initialization
+sleep 5
+
 # Map Cloud Run's PORT to N8N_PORT if it exists
+# Otherwise fall back to explicitly set N8N_PORT or default to 5678
 if [ -n "$PORT" ]; then
   export N8N_PORT=$PORT
+elif [ -z "$N8N_PORT" ]; then
+  export N8N_PORT=5678
 fi
 
 # Print environment variables for debugging
@@ -97,6 +115,16 @@ echo "N8N_PORT: $N8N_PORT"
 # Start n8n with its original entrypoint
 exec /docker-entrypoint.sh
 ```
+
+The port mapping script gives you flexibility - you can let Cloud Run assign the port dynamically OR set it explicitly. This is useful because:
+
+1. Cloud Run auto-assigns ports - if someone deploys without setting --port=5678, Cloud Run will inject a PORT variable
+
+2. Future-proofing - if Cloud Run changes port handling, the script adapts
+
+3. Works in multiple environments - the same image works on Cloud Run, Cloud Run Jobs, or other container platforms
+
+Option A doesn't need this because it explicitly sets everything via command-line flags. 
 
 **Dockerfile:**
 
@@ -116,15 +144,25 @@ ENTRYPOINT ["/bin/sh", "/startup.sh"]
 
 This custom setup solves the port mismatch problem and helps with debugging. Without it, you'd just see a failed container with no helpful error messages. And yes, that's exactly as frustrating as it sounds.
 
-* If you run into problems with this step, check that:
+**If you run into problems with Option B:**
 
-* Your `startup.sh` file has Unix-style line endings (LF, not CRLF)
+* Check that your `startup.sh` file has Unix-style line endings (LF, not CRLF)
 
-* The file has proper execute permissions
+* Verify the file has proper execute permissions
 
-## Step 3: Set Up a Container Repository ##
+### Which option should you choose?
 
-Let's create a place to store our container image:
+* **Go with Option A** if you just want n8n working reliably with minimal fuss
+
+* **Use Option B** if you need debugging output or custom startup scripts
+
+The rest of this guide will show commands for both approaches where they differ.
+
+## Step 3: Set Up a Container Repository (Optional - Custom Image Only) ##
+
+**If you're using Option A (official image)**, skip this step entirely and go straight to Step 4.
+
+**If you're using Option B (custom image)**, you'll need a place to store your custom container image:
 
 ```bash
 # Create a repository in Artifact Registry
@@ -218,12 +256,39 @@ Following the principle of least privilege here means your n8n service can acces
 
 ## Step 7: Deploy to Cloud Run ##
 
-The moment of truth - let's deploy n8n:
+The moment of truth - let's deploy n8n. The command differs slightly depending on which approach you chose in Step 2.
+
+First, get your Cloud SQL conection namne:
 
 ```bash
-# Get the connection name for your Cloud SQL instance
 export SQL_CONNECTION=$(gcloud sql instances describe n8n-db --format="value(connectionName)")
+```
 
+### Option A: Deploy Using Official Image (Recommended)
+
+```bash
+gcloud run deploy n8n \
+    --image=docker.n8n.io/n8nio/n8n:latest \
+    --command="/bin/sh" \
+    --args="-c,sleep 5; n8n start" \
+    --platform=managed \
+    --region=$REGION \
+    --allow-unauthenticated \
+    --port=5678 \
+    --cpu=1 \
+    --memory=2Gi \
+    --min-instances=0 \
+    --max-instances=1 \
+    --no-cpu-throttling \
+    --set-env-vars="N8N_PORT=5678,N8N_PROTOCOL=https,DB_TYPE=postgresdb,DB_POSTGRESDB_DATABASE=n8n,DB_POSTGRESDB_USER=n8n-user,DB_POSTGRESDB_HOST=/cloudsql/$SQL_CONNECTION,DB_POSTGRESDB_PORT=5432,DB_POSTGRESDB_SCHEMA=public,N8N_USER_FOLDER=/home/node/.n8n,GENERIC_TIMEZONE=UTC,QUEUE_HEALTH_CHECK_ACTIVE=true" \
+    --set-secrets="DB_POSTGRESDB_PASSWORD=n8n-db-password:latest,N8N_ENCRYPTION_KEY=n8n-encryption-key:latest" \
+    --add-cloudsql-instances=$SQL_CONNECTION \
+    --service-account=n8n-service-account@$PROJECT_ID.iam.gserviceaccount.com
+```
+
+### Option B: Deploy Using Custom Image ###
+
+```bash
 # Deploy to Cloud Run
 gcloud run deploy n8n \
     --image=$REGION-docker.pkg.dev/$PROJECT_ID/n8n-repo/n8n:latest \
@@ -244,31 +309,40 @@ gcloud run deploy n8n \
 
 After deployment, Cloud Run will provide a URL for your n8n instance. Note it down - you'll need it for the next steps.
 
-A word on the configuration: setting min-instances to 0 and max-instances to 1 means your service will scale down to nothing when not in use (saving you money) but won't run multiple instances simultaneously (which can cause database conflicts with n8n). The CPU and memory allocation is enough for most workflows without going overboard on cost. The CPU throttling setting allows for the n8n service to finish processing outside of request processing times, such as flushing data to the database.
+### Key Configuration Notes ###
+
+**Why `--no-cpu-throttling`?**
+n8n does background processing (database connections, scheduled checks) that happens outside HTTP requests. With CPU throttling enabled, these background tasks get starved and can cause startup issues. This flag ensures n8n gets continuous CPU access, which actually works out cheaper due to eliminated per-request fees and lower CPU/memory rates. Thanks to the Google Cloud Run team for this insight.
+
+**Other important settings:**
+- `min-instances=0` and `max-instances=1` means your service scales to zero when idle (saving money) but won't run multiple instances simultaneously (which can cause database conflicts with n8n)
+- CPU and memory allocation is sufficient for most workflows without excessive costs
+- The `sleep 5` in Option A handles database initialization timing
+
+### Key Differences Between Options ###
+
+| Setting | Option A (Official) | Option B (Custom) | Why Different? |
+|---------|-------------------|-------------------|----------------|
+| Image | `docker.n8n.io/n8nio/n8n:latest` | Your custom image | Direct from n8n vs your registry |
+| Command | `--command="/bin/sh" --args="-c,sleep 5; n8n start"` | Uses custom entrypoint | Sleep added via command vs built into script |
+| N8N_PORT | `5678` | `443` | Direct port vs mapped through startup script |
+| N8N_PATH | Not needed | `/` | Custom image can handle path prefixing |
 
 ### n8n Google Cloud Run Environment Variables ###
 
 Here's what all those environment variables do:
 
-```md
-|    Environment Variable   |            Value            |                                  Description                                 |
-|:-------------------------:|:---------------------------:|:----------------------------------------------------------------------------:|
-| N8N_PATH                  | /                           | Base path where n8n will be accessible                                       |
-| N8N_PORT                  | 443                         | External port (set to 443 for proper OAuth callback URL generation)          |
-| N8N_PROTOCOL              | https                       | Protocol used for external access                                            |
-| N8N_RUNNERS_ENABLED       | true                        | Enables task runners (required for newer n8n versions)                       |
-| DB_TYPE                   | postgresdb                  | Must be exactly "postgresdb" (not postgresql) for proper database connection |
-| DB_POSTGRESDB_DATABASE    | n8n                         | Name of the PostgreSQL database                                              |
-| DB_POSTGRESDB_USER        | n8n-user                    | Database user name                                                           |
-| DB_POSTGRESDB_HOST        | /cloudsql/[connection-name] | PostgreSQL connection path using Cloud SQL Unix socket format                |
-| DB_POSTGRESDB_PORT        | 5432                        | Standard PostgreSQL port                                                     |
-| DB_POSTGRESDB_SCHEMA      | public                      | Required for n8n to properly initialize database tables                      |
-| N8N_USER_FOLDER           | /home/node                  | Location for n8n data (previously /home/node/.n8n)                           |
-| GENERIC_TIMEZONE          | UTC                         | Default timezone for consistent time handling                                |
-| EXECUTIONS_PROCESS        | main                        | Set to "main" for single-container deployment                                |
-| EXECUTIONS_MODE           | regular                     | Controls workflow execution behavior                                         |
-| QUEUE_HEALTH_CHECK_ACTIVE | true                        | Critical for Cloud Run to verify container health                            |
-```
+|    Environment Variable   |   Option A Value    |   Option B Value    |                                  Description                                 |
+|:-------------------------:|:-------------------:|:-------------------:|:----------------------------------------------------------------------------:|
+| N8N_PATH                  | Not needed          | /                   | Base path where n8n will be accessible (custom image only)                   |
+| N8N_PORT                  | 5678                | 443                 | Port configuration (direct vs mapped)                                        |
+| N8N_PROTOCOL              | https               | https               | Protocol used for external access                                            |
+| DB_TYPE                   | postgresdb          | postgresdb          | Must be exactly "postgresdb" (not postgresql) for proper database connection |
+| N8N_USER_FOLDER           | /home/node/.n8n     | /home/node          | Location for n8n data                                                        |
+| EXECUTIONS_PROCESS        | Not needed          | main (deprecated)   | Deprecated - remove in newer versions                                        |
+| EXECUTIONS_MODE           | Not needed          | regular (deprecated)| Deprecated - remove in newer versions                                        |
+| QUEUE_HEALTH_CHECK_ACTIVE | true                | true                | Critical for Cloud Run to verify container health                            |
+
 
 Pay special attention to DB_TYPE. It must be "postgresdb" not "postgresql" - a quirk that's caused many deployment headaches. And don't explicitly set the PORT variable as Cloud Run injects this automatically.
 
@@ -341,7 +415,31 @@ Finally, to connect n8n with Google services like Sheets:
 
 Updating your n8n deployment is surprisingly straightforward, and it's something you should do regularly to get new features and security patches. Here's how to update when new versions are released:
 
-### Option 1: Rebuild and Redeploy (The Clean Way) ###
+### For Option A (Official Image)
+
+The simplest approach - just update the image tag:
+
+**Update to latest version**:
+
+```bash
+gcloud run services update n8n \
+    --image=docker.n8n.io/n8nio/n8n:latest \
+    --region=$REGION
+```
+
+**Or specify a version**:
+
+```bash
+gcloud run services update n8n \
+    --image=docker.n8n.io/n8nio/n8n:1.20.0 \
+    --region=$REGION
+```
+
+Cloud Run will pull the new image and deploy it automatically. Takes about 1-2 minutes.
+
+### For Option B (Custom Image)
+
+### Method 1: Rebuild and Redeploy (The Clean Way) ###
 
 ```bash
 # Pull the latest n8n image
@@ -361,7 +459,7 @@ gcloud run services update n8n \
 
 This process typically takes about 2-3 minutes and your n8n instance will experience a brief downtime as Cloud Run swaps over to the new container. Any running workflows will be interrupted, but scheduled triggers will resume once the service is back up.
 
-### Option 2: Specify Versions (The Controlled Way) ###
+### Method 2: Specify Versions (The Controlled Way) ###
 
 If you prefer to manage version upgrades more deliberately (recommended for production use), specify the exact n8n version:
 
