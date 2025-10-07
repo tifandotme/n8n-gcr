@@ -204,6 +204,7 @@ resource "google_cloud_run_v2_service" "n8n" {
           memory = var.cloud_run_memory
         }
         startup_cpu_boost = true
+        cpu_idle = false
       }
       env {
         name  = "N8N_PATH"
