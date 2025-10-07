@@ -1,13 +1,18 @@
 variable "gcp_project_id" {
   description = "Google Cloud project ID."
   type        = string
-  # No default - must be provided by user
 }
 
 variable "gcp_region" {
   description = "Google Cloud region for deployment."
   type        = string
-  default     = "us-west2" # Defaulting to your region
+  default     = "us-west2"
+}
+
+variable "use_custom_image" {
+  description = "Set to true to use custom Docker image (Option B), false to use official n8n image (Option A - recommended)."
+  type        = bool
+  default     = false
 }
 
 variable "db_name" {
@@ -35,9 +40,9 @@ variable "db_storage_size" {
 }
 
 variable "artifact_repo_name" {
-  description = "Name for the Artifact Registry repository."
+  description = "Name for the Artifact Registry repository (only used if use_custom_image is true)."
   type        = string
-  default     = "n8n-repo" # Corrected default to match guide/manual steps
+  default     = "n8n-repo"
 }
 
 variable "cloud_run_service_name" {
@@ -55,7 +60,7 @@ variable "service_account_name" {
 variable "cloud_run_cpu" {
   description = "CPU allocation for Cloud Run service."
   type        = string
-  default     = "2"
+  default     = "1"
 }
 
 variable "cloud_run_memory" {
@@ -67,7 +72,7 @@ variable "cloud_run_memory" {
 variable "cloud_run_max_instances" {
   description = "Maximum number of instances for Cloud Run service."
   type        = number
-  default     = 1 # As per the guide
+  default     = 1
 }
 
 variable "cloud_run_container_port" {
@@ -79,5 +84,5 @@ variable "cloud_run_container_port" {
 variable "generic_timezone" {
   description = "Timezone for n8n."
   type        = string
-  default     = "UTC" # As per the working config
+  default     = "UTC"
 }
