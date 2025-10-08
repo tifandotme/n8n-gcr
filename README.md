@@ -35,7 +35,7 @@ Before diving in, make sure you've got:
 
 * Basic familiarity with Docker and command line
 
-  **Docker** (only needed if using custom image - Option B)
+* **Docker** (only needed if using custom image - Option B)
 
 * A domain name (optional, but recommended for production use)
 
