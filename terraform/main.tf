@@ -310,7 +310,7 @@ resource "google_cloud_run_v2_service" "n8n" {
       startup_probe {
         initial_delay_seconds = 30
         timeout_seconds       = 240
-        period_seconds        = 10
+        period_seconds        = 240
         failure_threshold     = 3
         tcp_socket {
           port = var.cloud_run_container_port
