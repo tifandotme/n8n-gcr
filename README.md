@@ -79,7 +79,7 @@ n8n needs a small startup delay when connecting to external databases to avoid a
 
 ### Option A: Using the Official Image (Recommended)
 
-This is the simplest approach - use n8n's official Docker image with a command override to add a 5-second startup delay. This pattern comes from [n8n's own Kubernetes deployments](https://github.com/n8n-io/n8n-hosting/blob/main/kubernetes/n8n-deployment.yaml#L32) and works perfectly on Cloud Run.
+This is the simplest approach - use [n8n's official Docker image](https://hub.docker.com/r/n8nio/n8n) with a command override to add a 5-second startup delay. This pattern comes from [n8n's own Kubernetes deployments](https://github.com/n8n-io/n8n-hosting/blob/main/kubernetes/n8n-deployment.yaml#L32) and works perfectly on Cloud Run.
 
 **No additional files needed!** You'll use command overrides when deploying (covered in Step 7).
 
