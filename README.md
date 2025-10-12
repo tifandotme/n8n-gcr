@@ -268,7 +268,7 @@ export SQL_CONNECTION=$(gcloud sql instances describe n8n-db --format="value(con
 
 ```bash
 gcloud run deploy n8n \
-    --image=docker.n8n.io/n8nio/n8n:latest \
+    --image=docker.io/n8nio/n8n:latest \
     --command="/bin/sh" \
     --args="-c,sleep 5; n8n start" \
     --platform=managed \
@@ -323,7 +323,7 @@ n8n does background processing (database connections, scheduled checks) that hap
 
 | Setting | Option A (Official) | Option B (Custom) | Why Different? |
 |---------|-------------------|-------------------|----------------|
-| Image | `docker.n8n.io/n8nio/n8n:latest` | Your custom image | Direct from n8n vs your registry |
+| Image | `docker.io/n8nio/n8n:latest` | Your custom image | Direct from n8n vs your registry |
 | Command | `--command="/bin/sh" --args="-c,sleep 5; n8n start"` | Uses custom entrypoint | Sleep added via command vs built into script |
 | N8N_PORT | `5678` | `443` | Direct port vs mapped through startup script |
 | N8N_PATH | Not needed | `/` | Custom image can handle path prefixing |
@@ -423,7 +423,7 @@ The simplest approach - just update the image tag:
 
 ```bash
 gcloud run services update n8n \
-    --image=docker.n8n.io/n8nio/n8n:latest \
+    --image=docker.io/n8nio/n8n:latest \
     --region=$REGION
 ```
 
@@ -431,7 +431,7 @@ gcloud run services update n8n \
 
 ```bash
 gcloud run services update n8n \
-    --image=docker.n8n.io/n8nio/n8n:1.20.0 \
+    --image=docker.io/n8nio/n8n:latest:1.115.2 \
     --region=$REGION
 ```
 
