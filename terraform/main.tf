@@ -163,7 +163,7 @@ resource "google_project_iam_member" "sql_client" {
 # --- Cloud Run Service --- #
 locals {
   # Use official image or custom image based on variable
-  n8n_image = var.use_custom_image ? "${var.gcp_region}-docker.pkg.dev/${var.gcp_project_id}/${var.artifact_repo_name}/${var.cloud_run_service_name}:latest" : "docker.n8n.io/n8nio/n8n:latest"
+  n8n_image = var.use_custom_image ? "${var.gcp_region}-docker.pkg.dev/${var.gcp_project_id}/${var.artifact_repo_name}/${var.cloud_run_service_name}:latest" : "docker.io/n8nio/n8n:latest"
   
   # Port configuration differs between options
   n8n_port = var.use_custom_image ? "443" : "5678"
