@@ -616,6 +616,7 @@ Review the planned changes
 ```tf
 terraform plan
 ```
+[use with flag `terraform plan -var-file=terraform.tfvars` if you created the terraform.tfvars file]
 
 Deploy the infrastructure.
 
@@ -625,6 +626,7 @@ Deploy the infrastructure.
 ```tf
 terraform apply
 ```
+[use with flag `terraform apply -var-file=terraform.tfvars` if you created the terraform.tfvars file]
 
 **For Option B (custom image):**
 

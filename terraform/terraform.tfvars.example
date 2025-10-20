@@ -4,11 +4,15 @@
 # --- Optional (Defaults are likely suitable based on your setup) --- #
 # gcp_project_id = "your-project-id"
 # gcp_region     = "us-west2"
+
 # db_name        = "n8n"
 # db_user        = "n8n-user"
 # db_tier        = "db-f1-micro"
 # db_storage_size = 10
+
+# use_custom_image = false
 # artifact_repo_name = "n8n-repo"
+
 # cloud_run_service_name = "n8n"
 # service_account_name = "n8n-service-account"
 # cloud_run_cpu = "2"
