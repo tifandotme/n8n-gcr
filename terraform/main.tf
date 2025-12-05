@@ -48,6 +48,16 @@ resource "google_project_service" "cloudscheduler" {
   disable_on_destroy = true
 }
 
+resource "google_project_service" "serviceusage" {
+  service            = "serviceusage.googleapis.com"
+  disable_on_destroy = true
+}
+
+resource "google_project_service" "iam" {
+  service            = "iam.googleapis.com"
+  disable_on_destroy = true
+}
+
 # --- Artifact Registry (Optional - only for custom image) --- #
 resource "google_artifact_registry_repository" "n8n_repo" {
   count         = var.use_custom_image ? 1 : 0
