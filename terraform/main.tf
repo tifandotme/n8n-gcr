@@ -156,6 +156,37 @@ resource "google_secret_manager_secret_iam_member" "license_activation_key_secre
   member    = "serviceAccount:${google_service_account.n8n_sa.email}"
 }
 
+# --- CI Service Account & Permissions --- #
+resource "google_service_account" "ci_sa" {
+  account_id   = "n8n-ci-service-account"
+  display_name = "Service Account for GitHub Actions CI/CD"
+  project      = var.gcp_project_id
+}
+
+resource "google_project_iam_member" "ci_sa_artifact_writer" {
+  project = var.gcp_project_id
+  role    = "roles/artifactregistry.writer"
+  member  = "serviceAccount:${google_service_account.ci_sa.email}"
+}
+
+resource "google_project_iam_member" "ci_sa_run_admin" {
+  project = var.gcp_project_id
+  role    = "roles/run.admin"
+  member  = "serviceAccount:${google_service_account.ci_sa.email}"
+}
+
+resource "google_project_iam_member" "ci_sa_storage_admin" {
+  project = var.gcp_project_id
+  role    = "roles/storage.admin"
+  member  = "serviceAccount:${google_service_account.ci_sa.email}"
+}
+
+resource "google_project_iam_member" "ci_sa_secret_accessor" {
+  project = var.gcp_project_id
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${google_service_account.ci_sa.email}"
+}
+
 # --- Cloud Run Service --- #
 locals {
   # Use official image or custom image based on variable
