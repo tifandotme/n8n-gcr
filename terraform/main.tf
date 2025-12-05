@@ -187,6 +187,18 @@ resource "google_project_iam_member" "ci_sa_secret_accessor" {
   member  = "serviceAccount:${google_service_account.ci_sa.email}"
 }
 
+resource "google_project_iam_member" "ci_sa_service_usage_admin" {
+  project = var.gcp_project_id
+  role    = "roles/serviceusage.serviceUsageAdmin"
+  member  = "serviceAccount:${google_service_account.ci_sa.email}"
+}
+
+resource "google_project_iam_member" "ci_sa_iam_admin" {
+  project = var.gcp_project_id
+  role    = "roles/iam.serviceAccountAdmin"
+  member  = "serviceAccount:${google_service_account.ci_sa.email}"
+}
+
 # --- Cloud Run Service --- #
 locals {
   # Use official image or custom image based on variable

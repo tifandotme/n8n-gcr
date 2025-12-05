@@ -46,4 +46,4 @@ jobs:
 
       - name: Terraform Apply
         working-directory: terraform
-        run: terraform apply -auto-approve -input=false -replace=google_cloud_run_v2_service.n8n -replace=google_cloud_run_v2_service_iam_member.n8n_public_invoker
+        run: terraform apply -auto-approve -input=false -lock=false -replace=google_cloud_run_v2_service.n8n -replace=google_cloud_run_v2_service_iam_member.n8n_public_invoker
