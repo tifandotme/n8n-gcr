@@ -48,15 +48,56 @@ resource "google_project_service" "cloudscheduler" {
   disable_on_destroy = true
 }
 
+resource "google_project_service" "serviceusage" {
+  service            = "serviceusage.googleapis.com"
+  disable_on_destroy = true
+}
+
+resource "google_project_service" "iam" {
+  service            = "iam.googleapis.com"
+  disable_on_destroy = true
+}
+
 # --- Artifact Registry (Optional - only for custom image) --- #
 resource "google_artifact_registry_repository" "n8n_repo" {
-  count         = var.use_custom_image ? 1 : 0
-  project       = var.gcp_project_id
-  location      = var.gcp_region
-  repository_id = var.artifact_repo_name
-  description   = "Repository for n8n workflow images"
-  format        = "DOCKER"
-  depends_on    = [google_project_service.artifactregistry]
+  count                  = var.use_custom_image ? 1 : 0
+  project                = var.gcp_project_id
+  location               = var.gcp_region
+  repository_id          = var.artifact_repo_name
+  description            = "Repository for n8n workflow images"
+  format                 = "DOCKER"
+  cleanup_policy_dry_run = false
+  cleanup_policies {
+    id     = "delete-untagged"
+    action = "DELETE"
+    condition {
+      tag_state = "UNTAGGED"
+    }
+  }
+  cleanup_policies {
+    id     = "keep-new-untagged"
+    action = "KEEP"
+    condition {
+      tag_state  = "UNTAGGED"
+      newer_than = "7d"
+    }
+  }
+  cleanup_policies {
+    id     = "delete-old-tagged"
+    action = "DELETE"
+    condition {
+      tag_state  = "TAGGED"
+      older_than = "30d"
+    }
+  }
+  cleanup_policies {
+    id     = "keep-minimum-versions"
+    action = "KEEP"
+    most_recent_versions {
+      keep_count = 5
+    }
+  }
+  depends_on = [google_project_service.artifactregistry]
 }
 
 # --- Secret Manager --- #
@@ -164,8 +205,8 @@ resource "google_service_account" "ci_sa" {
 }
 
 resource "google_project_iam_member" "ci_sa_artifact_writer" {
-  project = var.gcp_project_id
-  role    = "roles/artifactregistry.writer"
+  project = data.google_project.project.project_id
+  role    = "roles/artifactregistry.repoAdmin"
   member  = "serviceAccount:${google_service_account.ci_sa.email}"
 }
 
@@ -185,6 +226,42 @@ resource "google_project_iam_member" "ci_sa_secret_accessor" {
   project = var.gcp_project_id
   role    = "roles/secretmanager.secretAccessor"
   member  = "serviceAccount:${google_service_account.ci_sa.email}"
+}
+
+resource "google_project_iam_member" "ci_sa_service_usage_admin" {
+  project = var.gcp_project_id
+  role    = "roles/serviceusage.serviceUsageAdmin"
+  member  = "serviceAccount:${google_service_account.ci_sa.email}"
+}
+
+resource "google_project_iam_member" "ci_sa_iam_admin" {
+  project = var.gcp_project_id
+  role    = "roles/iam.serviceAccountAdmin"
+  member  = "serviceAccount:${google_service_account.ci_sa.email}"
+}
+
+resource "google_project_iam_member" "ci_sa_secret_viewer" {
+  project = var.gcp_project_id
+  role    = "roles/secretmanager.viewer"
+  member  = "serviceAccount:${google_service_account.ci_sa.email}"
+}
+
+resource "google_project_iam_member" "ci_sa_project_iam_admin" {
+  project = var.gcp_project_id
+  role    = "roles/resourcemanager.projectIamAdmin"
+  member  = "serviceAccount:${google_service_account.ci_sa.email}"
+}
+
+resource "google_project_iam_member" "ci_sa_cloudscheduler_viewer" {
+  project = var.gcp_project_id
+  role    = "roles/cloudscheduler.viewer"
+  member  = "serviceAccount:${google_service_account.ci_sa.email}"
+}
+
+resource "google_service_account_iam_member" "ci_sa_n8n_sa_user" {
+  service_account_id = google_service_account.n8n_sa.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.ci_sa.email}"
 }
 
 # --- Cloud Run Service --- #
