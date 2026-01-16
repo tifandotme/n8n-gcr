@@ -1,4 +1,5 @@
-output "cloud_run_service_url" {
-  description = "URL of the deployed n8n Cloud Run service."
-  value       = google_cloud_run_v2_service.n8n.uri
+output "ci_sa_key" {
+  description = "CI Service Account Key"
+  value       = google_service_account_key.ci_sa_key.private_key
+  sensitive   = true
 }
