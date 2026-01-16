@@ -1,0 +1,19 @@
+[env]
+_.file = ".env"
+
+[tools]
+terraform = "latest"
+
+[tasks.encrypt]
+run = "dotenvx encrypt -ek TF_VAR_project_id -ek TF_VAR_region"
+
+[tasks."check"]
+description = "Run terraform fmt and validate"
+run = """
+terraform fmt
+terraform validate
+"""
+
+[tasks."terraform:clean"]
+description = "Clean Terraform init artifacts"
+run = "rm -rf .terraform .terraform.lock.hcl"
