@@ -14,10 +14,10 @@
 4. DB Metrics: Check usage in Neon Console (compute hours, storage).
 5. Neon Status: Ensure DB is active (not suspended).
 6. Monitoring: Use GCP Console > Monitoring for built-in Cloud Run metrics/logs; n8n /metrics enabled for external scraping if desired.
-7. URL: `terraform output -raw cloud_run_service_url`
+7. URL: Check in GCP Console or visit https://<DOMAIN>
 8. Images: `gcloud artifacts docker images list --location=us-west1 --repository=n8n-repo --project <PROJECT>`
 9. DB Connect: `psql "postgresql://neondb_owner:<PASSWORD>@<NEON_HOST>/neondb?sslmode=require"`
-10. Mise: `mise run terraform:plan`, `mise run update-n8n`, `mise run terraform:validate`
+10. Terraform: `terraform plan`, `mise run check`
 
 ## Backups & Recovery (Neon)
 
@@ -28,28 +28,25 @@
 
 ## Upgrading n8n
 
-1. Run `mise run update-n8n` (pulls latest, builds/pushes custom image, redeploys).
+1. Test locally, build/push with `docker buildx build --platform linux/amd64 -t us-west1-docker.pkg.dev/<PROJECT>/n8n-repo/n8n:<TAG> --push .`, deploy with `terraform apply` (pass to user).
 2. Monitor logs; rollback if needed (change image tag in TF, apply).
-3. For manual: Test locally, build/push with `mise run build-and-push`, deploy with `mise run terraform:deploy`.
 
 ## Building Custom Image
 
-- `mise run build-and-push` (includes auth, installs @actual-app/api)
 - Manual: `docker buildx build --platform linux/amd64 -t us-west1-docker.pkg.dev/<PROJECT>/n8n-repo/n8n:<TAG> --push .`
-- Auth: `mise run configure-docker`
+- Auth: `gcloud auth configure-docker $TF_VAR_region-docker.pkg.dev`
 
 ## Terraform Workflow
 
-- Remote Backend: State stored in GCS bucket "n8n-terraform-state-bucket" with prefix "n8n". Created with `mise run create-state-bucket`.
-- Plan: `mise run terraform:plan`
-- Apply: `mise run terraform:deploy` (never run apply/destroy directly; pass to user)
-- Validate: `mise run terraform:validate` or `mise run terraform:check`
-- Output URL: `terraform output -raw cloud_run_service_url`
+- Remote Backend: State stored in GCS bucket "n8n-terraform-state-bucket" with prefix "n8n".
+- Plan: `terraform plan`
+- Apply: `terraform apply` (never run apply/destroy directly; pass to user)
+- Validate: `mise run check`
 - Clean: `mise run terraform:clean`
 
 ## Automation & CI/CD
 
-- Integrate GitHub Actions for auto-deploys: Push to main triggers `mise run terraform:deploy`. State is remote, avoiding sync issues.
+- Integrate GitHub Actions for auto-deploys: Push to main triggers `terraform apply`. State is remote, avoiding sync issues.
 - Alerts: Slack/webhooks for failures; test for false positives.
 
 ## Scaling & Cost Control
@@ -70,7 +67,7 @@
 
 ## Troubleshooting
 
-- Image not found: Check push/IAM; run `mise run build-and-push`. If Terraform apply fails with "Image '...' not found", run `mise run build-and-push` then re-run `terraform apply`.
+- Image not found: Check push/IAM; run `docker buildx build --platform linux/amd64 -t us-west1-docker.pkg.dev/<PROJECT>/n8n-repo/n8n:<TAG> --push .`. If Terraform apply fails with "Image '...' not found", run the build command then re-run `terraform apply`.
 - Crashes: Check logs, DB connectivity (ensure Neon active).
 - SSL errors: Verify `DB_POSTGRESDB_SSL=require`.
 - Compute exceeded: Upgrade Neon plan.
@@ -81,7 +78,7 @@
 ## Disaster Recovery
 
 1. DB loss: Restore from Neon PITR/dump.
-2. Service broken: Rollback image tag in TF, `mise run terraform:deploy`.
+2. Service broken: Rollback image tag in TF, `terraform apply`.
 3. Compromised: Rotate secrets in Secret Manager, redeploy.
 
 ### Test Recovery
@@ -97,7 +94,7 @@
 4. Delete images: `gcloud artifacts docker images delete ...`
 5. Delete service: `gcloud run services delete n8n --region=us-west1`
 6. Delete domain mapping: `gcloud run domain-mappings delete <DOMAIN> --region=us-west1`
-7. TF destroy: `mise run terraform:destroy` (if added)
+7. TF destroy: `terraform destroy` (pass to user)
 8. Clean up: GCS, IAM, Neon project.
 
 ## Weekly Checklist
