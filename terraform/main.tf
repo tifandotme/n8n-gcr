@@ -516,7 +516,6 @@ resource "google_cloud_run_v2_service" "n8n" {
         failure_threshold     = 3
         http_get {
           path = "/healthz/readiness"
-          port = local.container_port
         }
       }
     }
