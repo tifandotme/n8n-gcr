@@ -263,6 +263,18 @@ resource "google_project_iam_member" "ci_sa_cloudscheduler_viewer" {
   member  = "serviceAccount:${google_service_account.ci_sa.email}"
 }
 
+resource "google_project_iam_member" "ci_sa_secret_version_manager" {
+  project = var.project_id
+  role    = "roles/secretmanager.secretVersionManager"
+  member  = "serviceAccount:${google_service_account.ci_sa.email}"
+}
+
+resource "google_project_iam_member" "ci_sa_sa_key_admin" {
+  project = var.project_id
+  role    = "roles/iam.serviceAccountKeyAdmin"
+  member  = "serviceAccount:${google_service_account.ci_sa.email}"
+}
+
 resource "google_service_account_key" "ci_sa_key" {
   service_account_id = google_service_account.ci_sa.name
 }
