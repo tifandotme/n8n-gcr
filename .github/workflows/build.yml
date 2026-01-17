@@ -24,6 +24,10 @@ jobs:
 
       - run: dotenvx get --format eval -f terraform/.env | grep TF_VAR | sed 's/ /\n/g' >> $GITHUB_ENV
 
+      - run: |
+          echo "Debug: TF_VAR envs"
+          env | grep TF_VAR
+
       - run: gcloud auth configure-docker $TF_VAR_region-docker.pkg.dev
 
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
