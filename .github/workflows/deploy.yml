@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  update:
+  deploy:
     runs-on: ubuntu-slim
     env:
       DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_PRIVATE_KEY }}
