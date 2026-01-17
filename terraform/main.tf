@@ -267,16 +267,17 @@ resource "google_service_account_key" "ci_sa_key" {
   service_account_id = google_service_account.ci_sa.name
 }
 
-# ==
+# CLOUD RUN
 
 locals {
-  domain = "n8n.tifan.me"
-  port   = "443"
+  domain         = "n8n.tifan.me"
+  container_port = "5678"
+  n8n_port       = "443" // 443 if using custom image, else 5678
 }
 
 resource "google_cloud_run_v2_service" "n8n" {
   name     = "n8n"
-  location = provider
+  location = var.region
   project  = var.project_id
 
   ingress             = "INGRESS_TRAFFIC_ALL"
@@ -292,7 +293,7 @@ resource "google_cloud_run_v2_service" "n8n" {
       image = "${var.region}-docker.pkg.dev/${var.project_id}/n8n-repo/n8n:latest"
 
       ports {
-        container_port = local.port
+        container_port = local.container_port
       }
       resources {
         limits = {
@@ -309,7 +310,7 @@ resource "google_cloud_run_v2_service" "n8n" {
       }
       env {
         name  = "N8N_PORT"
-        value = local.port
+        value = local.n8n_port
       }
       env {
         name  = "N8N_PROTOCOL"
@@ -503,7 +504,7 @@ resource "google_cloud_run_v2_service" "n8n" {
         failure_threshold     = 3
         http_get {
           path = "/healthz/readiness"
-          port = local.port
+          port = local.container_port
         }
       }
     }
