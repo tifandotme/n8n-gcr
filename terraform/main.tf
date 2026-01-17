@@ -508,6 +508,10 @@ resource "google_cloud_run_v2_service" "n8n" {
         name  = "NO_COLOR"
         value = "true"
       }
+      env {
+        name  = "NODES_EXCLUDE"
+        value = "[]"
+      }
 
       startup_probe {
         initial_delay_seconds = 30

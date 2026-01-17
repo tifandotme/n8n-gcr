@@ -8,19 +8,12 @@ if [ -n "$PORT" ]; then
   export N8N_PORT="$PORT"
 fi
 
-# Check npm global prefix and package
-echo "NPM global prefix: $(npm config get prefix)"
-echo "Checking @actual-app/api: $(npm list -g @actual-app/api 2>/dev/null || echo 'Not found')"
-
 # Print environment variables for debugging
 echo "Database settings:"
 echo "DB_TYPE: $DB_TYPE"
 echo "DB_POSTGRESDB_HOST: $DB_POSTGRESDB_HOST"
 echo "DB_POSTGRESDB_PORT: $DB_POSTGRESDB_PORT"
 echo "N8N_PORT: $N8N_PORT"
-
-# Set NODE_PATH to make globally installed packages available to task runners
-export NODE_PATH=/opt/nodejs/node-v22.21.1/lib/node_modules
 
 # Start n8n with its original entrypoint
 exec /docker-entrypoint.sh
