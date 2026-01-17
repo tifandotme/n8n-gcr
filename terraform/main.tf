@@ -13,20 +13,11 @@ terraform {
 }
 
 provider "google" {
-  project = var.gcp_project_id
-  region  = var.gcp_region
+  project = var.project_id
+  region  = var.region
 }
 
-# Data source to get the project number
-data "google_project" "project" {
-  project_id = var.gcp_project_id
-}
-
-# --- Services --- #
-resource "google_project_service" "artifactregistry" {
-  service            = "artifactregistry.googleapis.com"
-  disable_on_destroy = true
-}
+# APIs
 
 resource "google_project_service" "run" {
   service            = "run.googleapis.com"
@@ -58,12 +49,17 @@ resource "google_project_service" "iam" {
   disable_on_destroy = true
 }
 
-# --- Artifact Registry (Optional - only for custom image) --- #
+resource "google_project_service" "artifactregistry" {
+  service            = "artifactregistry.googleapis.com"
+  disable_on_destroy = true
+}
+
+# REGISTRY
+
 resource "google_artifact_registry_repository" "n8n_repo" {
-  count                  = var.use_custom_image ? 1 : 0
-  project                = var.gcp_project_id
-  location               = var.gcp_region
-  repository_id          = var.artifact_repo_name
+  project                = var.project_id
+  location               = var.region
+  repository_id          = "n8n-repo"
   description            = "Repository for n8n workflow images"
   format                 = "DOCKER"
   cleanup_policy_dry_run = false
@@ -100,10 +96,11 @@ resource "google_artifact_registry_repository" "n8n_repo" {
   depends_on = [google_project_service.artifactregistry]
 }
 
-# --- Secret Manager --- #
+# SECRETS
+
 resource "google_secret_manager_secret" "actual_password_secret" {
   secret_id = "n8n-actual-password"
-  project   = var.gcp_project_id
+  project   = var.project_id
   replication {
     auto {}
   }
@@ -117,7 +114,7 @@ resource "google_secret_manager_secret_version" "actual_password_secret_version"
 
 resource "google_secret_manager_secret" "db_password_secret" {
   secret_id = "n8n-db-password"
-  project   = var.gcp_project_id
+  project   = var.project_id
   replication {
     auto {}
   }
@@ -135,8 +132,8 @@ resource "random_password" "n8n_encryption_key" {
 }
 
 resource "google_secret_manager_secret" "encryption_key_secret" {
-  secret_id = "${var.cloud_run_service_name}-encryption-key"
-  project   = var.gcp_project_id
+  secret_id = "n8n-encryption-key"
+  project   = var.project_id
   replication {
     auto {}
   }
@@ -150,7 +147,7 @@ resource "google_secret_manager_secret_version" "encryption_key_secret_version" 
 
 resource "google_secret_manager_secret" "license_activation_key_secret" {
   secret_id = "n8n-license-activation-key"
-  project   = var.gcp_project_id
+  project   = var.project_id
   replication {
     auto {}
   }
@@ -162,11 +159,18 @@ resource "google_secret_manager_secret_version" "license_activation_key_secret_v
   secret_data = var.license_activation_key
 }
 
-# --- IAM Service Account & Permissions --- #
+# CLOUD RUN SERVICE ACCOUNT
+
 resource "google_service_account" "n8n_sa" {
-  account_id   = var.service_account_name
+  account_id   = "n8n-service-account"
   display_name = "n8n Service Account for Cloud Run"
-  project      = var.gcp_project_id
+  project      = var.project_id
+}
+
+resource "google_service_account_iam_member" "ci_sa_n8n_sa_user" {
+  service_account_id = google_service_account.n8n_sa.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.ci_sa.email}"
 }
 
 resource "google_secret_manager_secret_iam_member" "actual_password_secret_accessor" {
@@ -197,89 +201,83 @@ resource "google_secret_manager_secret_iam_member" "license_activation_key_secre
   member    = "serviceAccount:${google_service_account.n8n_sa.email}"
 }
 
-# --- CI Service Account & Permissions --- #
-resource "google_service_account" "ci_sa" {
-  account_id   = "n8n-ci-service-account"
-  display_name = "Service Account for GitHub Actions CI/CD"
-  project      = var.gcp_project_id
-}
+# CI SERVICE ACCOUNT
 
-resource "google_project_iam_member" "ci_sa_artifact_writer" {
-  project = data.google_project.project.project_id
-  role    = "roles/artifactregistry.repoAdmin"
-  member  = "serviceAccount:${google_service_account.ci_sa.email}"
+resource "google_service_account" "ci_sa" {
+  account_id   = "n8n-ci-sa"
+  display_name = "CI Service Account"
+  project      = var.project_id
 }
 
 resource "google_project_iam_member" "ci_sa_run_admin" {
-  project = var.gcp_project_id
+  project = var.project_id
   role    = "roles/run.admin"
   member  = "serviceAccount:${google_service_account.ci_sa.email}"
 }
 
+resource "google_project_iam_member" "ci_sa_artifact_writer" {
+  project = var.project_id
+  role    = "roles/artifactregistry.repoAdmin"
+  member  = "serviceAccount:${google_service_account.ci_sa.email}"
+}
+
 resource "google_project_iam_member" "ci_sa_storage_admin" {
-  project = var.gcp_project_id
+  project = var.project_id
   role    = "roles/storage.admin"
   member  = "serviceAccount:${google_service_account.ci_sa.email}"
 }
 
 resource "google_project_iam_member" "ci_sa_secret_accessor" {
-  project = var.gcp_project_id
+  project = var.project_id
   role    = "roles/secretmanager.secretAccessor"
   member  = "serviceAccount:${google_service_account.ci_sa.email}"
 }
 
 resource "google_project_iam_member" "ci_sa_service_usage_admin" {
-  project = var.gcp_project_id
+  project = var.project_id
   role    = "roles/serviceusage.serviceUsageAdmin"
   member  = "serviceAccount:${google_service_account.ci_sa.email}"
 }
 
 resource "google_project_iam_member" "ci_sa_iam_admin" {
-  project = var.gcp_project_id
+  project = var.project_id
   role    = "roles/iam.serviceAccountAdmin"
   member  = "serviceAccount:${google_service_account.ci_sa.email}"
 }
 
 resource "google_project_iam_member" "ci_sa_secret_viewer" {
-  project = var.gcp_project_id
+  project = var.project_id
   role    = "roles/secretmanager.viewer"
   member  = "serviceAccount:${google_service_account.ci_sa.email}"
 }
 
 resource "google_project_iam_member" "ci_sa_project_iam_admin" {
-  project = var.gcp_project_id
+  project = var.project_id
   role    = "roles/resourcemanager.projectIamAdmin"
   member  = "serviceAccount:${google_service_account.ci_sa.email}"
 }
 
 resource "google_project_iam_member" "ci_sa_cloudscheduler_viewer" {
-  project = var.gcp_project_id
+  project = var.project_id
   role    = "roles/cloudscheduler.viewer"
   member  = "serviceAccount:${google_service_account.ci_sa.email}"
 }
 
-resource "google_service_account_iam_member" "ci_sa_n8n_sa_user" {
-  service_account_id = google_service_account.n8n_sa.name
-  role               = "roles/iam.serviceAccountUser"
-  member             = "serviceAccount:${google_service_account.ci_sa.email}"
+resource "google_service_account_key" "ci_sa_key" {
+  service_account_id = google_service_account.ci_sa.name
 }
 
-# --- Cloud Run Service --- #
+# ==
+
 locals {
-  # Use official image or custom image based on variable
-  n8n_image = var.use_custom_image ? "${var.gcp_region}-docker.pkg.dev/${var.gcp_project_id}/${var.artifact_repo_name}/${var.cloud_run_service_name}:latest" : "docker.io/n8nio/n8n:latest"
-
-  # Port configuration differs between options
-  n8n_port = var.use_custom_image ? "443" : "5678"
-
-  # User folder differs between options
-  n8n_user_folder = var.use_custom_image ? "/home/node" : "/home/node/.n8n"
+  domain = "n8n.tifan.me"
+  port   = "443"
 }
 
 resource "google_cloud_run_v2_service" "n8n" {
-  name     = var.cloud_run_service_name
-  location = var.gcp_region
-  project  = var.gcp_project_id
+  name     = "n8n"
+  location = provider
+  project  = var.project_id
 
   ingress             = "INGRESS_TRAFFIC_ALL"
   deletion_protection = false
@@ -287,40 +285,31 @@ resource "google_cloud_run_v2_service" "n8n" {
   template {
     service_account = google_service_account.n8n_sa.email
     scaling {
-      max_instance_count = var.cloud_run_max_instances
+      max_instance_count = 1
       min_instance_count = 0
     }
     containers {
-      image = local.n8n_image
-
-      # Set command and args for official image (Option A)
-      command = var.use_custom_image ? null : ["/bin/sh"]
-      args    = var.use_custom_image ? null : ["-c", "sleep 5; n8n start"]
+      image = "${var.region}-docker.pkg.dev/${var.project_id}/n8n-repo/n8n:latest"
 
       ports {
-        container_port = var.cloud_run_container_port
+        container_port = local.port
       }
       resources {
         limits = {
-          cpu    = var.cloud_run_cpu
-          memory = var.cloud_run_memory
+          cpu    = "1"
+          memory = "512Mi"
         }
         startup_cpu_boost = true
         cpu_idle          = false # This is --no-cpu-throttling
       }
 
-      # Only set N8N_PATH for custom image
-      dynamic "env" {
-        for_each = var.use_custom_image ? [1] : []
-        content {
-          name  = "N8N_PATH"
-          value = "/"
-        }
+      env {
+        name  = "N8N_PATH"
+        value = "/"
       }
-
       env {
         name  = "N8N_PORT"
-        value = local.n8n_port
+        value = local.port
       }
       env {
         name  = "N8N_PROTOCOL"
@@ -332,19 +321,19 @@ resource "google_cloud_run_v2_service" "n8n" {
       }
       env {
         name  = "DB_POSTGRESDB_DATABASE"
-        value = var.db_name
+        value = "neondb"
       }
       env {
         name  = "DB_POSTGRESDB_USER"
-        value = var.db_user
+        value = "neondb_owner"
       }
       env {
         name  = "DB_POSTGRESDB_HOST"
-        value = var.db_host
+        value = "ep-plain-mountain-afhf98oq-pooler.c-2.us-west-2.aws.neon.tech"
       }
       env {
         name  = "DB_POSTGRESDB_PORT"
-        value = var.db_port
+        value = "5432"
       }
       env {
         name  = "DB_POSTGRESDB_SCHEMA"
@@ -360,11 +349,11 @@ resource "google_cloud_run_v2_service" "n8n" {
       }
       env {
         name  = "N8N_USER_FOLDER"
-        value = local.n8n_user_folder
+        value = "/home/node"
       }
       env {
         name  = "GENERIC_TIMEZONE"
-        value = var.generic_timezone
+        value = "Asia/Jakarta"
       }
       env {
         name  = "QUEUE_HEALTH_CHECK_ACTIVE"
@@ -403,15 +392,15 @@ resource "google_cloud_run_v2_service" "n8n" {
       }
       env {
         name  = "N8N_HOST"
-        value = var.custom_domain
+        value = local.domain
       }
       env {
         name  = "WEBHOOK_URL"
-        value = "https://${var.custom_domain}"
+        value = "https://${local.domain}"
       }
       env {
         name  = "N8N_EDITOR_BASE_URL"
-        value = "https://${var.custom_domain}"
+        value = "https://${local.domain}"
       }
       env {
         name  = "N8N_RUNNERS_ENABLED"
@@ -439,14 +428,13 @@ resource "google_cloud_run_v2_service" "n8n" {
         value = "*"
       }
 
-      // Actual
       env {
         name  = "ACTUAL_SERVER_URL"
-        value = "https://${var.actual_server_url}"
+        value = "https://budget.tifan.me"
       }
       env {
         name  = "ACTUAL_SYNC_ID"
-        value = var.actual_sync_id
+        value = "278a95d3-2467-4941-8125-24765283a859"
       }
       env {
         name = "ACTUAL_PASSWORD"
@@ -515,7 +503,7 @@ resource "google_cloud_run_v2_service" "n8n" {
         failure_threshold     = 3
         http_get {
           path = "/healthz/readiness"
-          port = var.cloud_run_container_port
+          port = local.port
         }
       }
     }
@@ -543,30 +531,32 @@ resource "google_cloud_run_v2_service_iam_member" "n8n_public_invoker" {
   member   = "allUsers"
 }
 
-# Domain mapping for custom domain
+# DOMAIN MAPPING
+
 resource "google_cloud_run_domain_mapping" "n8n_domain" {
   count    = 1
-  name     = var.custom_domain
-  location = var.gcp_region
+  name     = local.domain
+  location = var.region
   metadata {
-    namespace = var.gcp_project_id
+    namespace = var.project_id
   }
   spec {
     route_name = google_cloud_run_v2_service.n8n.name
   }
 }
 
-# Cloud Scheduler jobs to wake up n8n at specified times
+# CLOUD SCHEDULER
+
 resource "google_cloud_scheduler_job" "n8n_wake_up" {
-  for_each = { for idx, time in var.scheduler_times : idx => time }
+  for_each = { for idx, time in ["55 5 * * 6,0"] : idx => time }
 
   description = "Wake up n8n at specified times"
   name        = "n8n-wake-up-${each.key}"
   schedule    = each.value
-  time_zone   = var.generic_timezone
+  time_zone   = "Asia/Jakarta"
 
   http_target {
-    uri         = "https://${var.custom_domain}"
+    uri         = "https://${local.domain}"
     http_method = "GET"
   }
 
