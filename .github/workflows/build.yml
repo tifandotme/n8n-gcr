@@ -1,0 +1,36 @@
+name: Build and Push
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    env:
+      DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_PRIVATE_KEY }}
+
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - run: curl -sfS https://dotenvx.sh/install.sh | sh
+
+      - id: sa-key
+        run: echo "json=$(dotenvx get BASE64_ENCODED_SERVICE_ACCOUNT_JSON)" >> $GITHUB_OUTPUT
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          credentials_json: ${{ steps.sa-key.outputs.json }}
+
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      - run: dotenvx get --format eval -f terraform/.env | grep TF_VAR >> $GITHUB_ENV
+
+      - run: gcloud auth configure-docker $TF_VAR_region-docker.pkg.dev
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          tags: ${{ env.TF_VAR_region }}-docker.pkg.dev/${{ env.TF_VAR_project_id }}/n8n-repo/n8n:latest
