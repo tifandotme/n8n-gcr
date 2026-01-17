@@ -2,6 +2,11 @@ name: Build and Push
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'N8N version tag (e.g., 1.45.0)'
+        required: true
+        default: 'latest'
 
 jobs:
   build:
@@ -34,4 +39,8 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64
-          tags: ${{ env.TF_VAR_region }}-docker.pkg.dev/${{ env.TF_VAR_project_id }}/n8n-repo/n8n:latest
+          build-args: |
+            N8N_VERSION=${{ github.event.inputs.version }}
+          tags: |
+            ${{ env.TF_VAR_region }}-docker.pkg.dev/${{ env.TF_VAR_project_id }}/n8n-repo/n8n:${{ github.event.inputs.version }}
+            ${{ env.TF_VAR_region }}-docker.pkg.dev/${{ env.TF_VAR_project_id }}/n8n-repo/n8n:latest
