@@ -505,11 +505,11 @@ resource "google_cloud_run_v2_service" "n8n" {
         value = "true"
       }
       env {
-        name  = "N8N_BLOCK_ENV_ACCESS_IN_NODE	"
+        name  = "N8N_BLOCK_ENV_ACCESS_IN_NODE"
         value = "false" # default is true
       }
       env {
-        name  = "N8N_GIT_NODE_DISABLE_BARE_REPOS	"
+        name  = "N8N_GIT_NODE_DISABLE_BARE_REPOS"
         value = "true"
       }
 
