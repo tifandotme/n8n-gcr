@@ -11,4 +11,4 @@ gcloud auth application-default set-quota-project $TF_VAR_project_id
 [tasks.logs]
 description = "Read logs from the n8n service"
 depends = ["set-project"]
-run = "gcloud run services logs read n8n --region $TF_VAR_region --project $TF_VAR_project_id"
+run = "gcloud run services logs read n8n --region $TF_VAR_region --project $TF_VAR_project_id --limit 20"
