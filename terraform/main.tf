@@ -478,7 +478,7 @@ resource "google_cloud_run_v2_service" "n8n" {
       }
       env {
         name  = "NODE_OPTIONS"
-        value = "env-file=/home/node/.env"
+        value = "--env-file=/home/node/.env"
       }
       # Disable diagnostics
       env {
