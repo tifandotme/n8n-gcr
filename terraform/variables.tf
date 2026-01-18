@@ -25,3 +25,9 @@ variable "webhook_auth_key" {
   type        = string
   sensitive   = true
 }
+
+variable "actual_password" {
+  description = "Password for Actual server."
+  type        = string
+  sensitive   = true
+}
