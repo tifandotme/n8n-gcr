@@ -320,6 +320,12 @@ resource "google_project_iam_member" "ci_sa_secret_version_manager" {
   member  = "serviceAccount:${google_service_account.ci_sa.email}"
 }
 
+resource "google_project_iam_member" "ci_sa_secret_admin" {
+  project = var.project_id
+  role    = "roles/secretmanager.admin"
+  member  = "serviceAccount:${google_service_account.ci_sa.email}"
+}
+
 resource "google_project_iam_member" "ci_sa_sa_key_admin" {
   project = var.project_id
   role    = "roles/iam.serviceAccountKeyAdmin"
