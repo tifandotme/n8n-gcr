@@ -565,7 +565,7 @@ resource "google_cloud_run_domain_mapping" "n8n_domain" {
 # CLOUD SCHEDULER
 
 resource "google_cloud_scheduler_job" "n8n_wake_up" {
-  for_each = { for idx, time in ["55 5 * * 6,0"] : idx => time }
+  for_each = { for idx, time in ["55 5 * * 0"] : idx => time }
 
   description = "Wake up n8n at specified times"
   name        = "n8n-wake-up-${each.key}"
