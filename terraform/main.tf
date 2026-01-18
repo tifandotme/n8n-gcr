@@ -531,6 +531,24 @@ resource "google_cloud_run_v2_service" "n8n" {
         value = "[]"
       }
 
+      env {
+        name  = "ACTUAL_SERVER_URL"
+        value = "https://actual.tifan.me"
+      }
+      env {
+        name  = "ACTUAL_SYNC_ID"
+        value = "278a95d3-2467-4941-8125-24765283a859"
+      }
+      # env {
+      #   name = "ACTUAL_PASSWORD"
+      #   value_source {
+      #     secret_key_ref {
+      #       secret  = google_secret_manager_secret.actual_password_secret.secret_id
+      #       version = "latest"
+      #     }
+      #   }
+      # }
+
       startup_probe {
         initial_delay_seconds = 30
         timeout_seconds       = 240
