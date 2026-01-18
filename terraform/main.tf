@@ -149,20 +149,6 @@ resource "google_pubsub_subscription" "n8n_push_subscription_test" {
 
 # SECRETS
 
-resource "google_secret_manager_secret" "actual_password_secret" {
-  secret_id = "n8n-actual-password"
-  project   = var.project_id
-  replication {
-    auto {}
-  }
-  depends_on = [google_project_service.secretmanager]
-}
-
-resource "google_secret_manager_secret_version" "actual_password_secret_version" {
-  secret      = google_secret_manager_secret.actual_password_secret.id
-  secret_data = var.actual_password
-}
-
 resource "google_secret_manager_secret" "db_password_secret" {
   secret_id = "n8n-db-password"
   project   = var.project_id
@@ -222,13 +208,6 @@ resource "google_service_account_iam_member" "ci_sa_n8n_sa_user" {
   service_account_id = google_service_account.n8n_sa.name
   role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:${google_service_account.ci_sa.email}"
-}
-
-resource "google_secret_manager_secret_iam_member" "actual_password_secret_accessor" {
-  project   = google_secret_manager_secret.actual_password_secret.project
-  secret_id = google_secret_manager_secret.actual_password_secret.secret_id
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${google_service_account.n8n_sa.email}"
 }
 
 resource "google_secret_manager_secret_iam_member" "db_password_secret_accessor" {
@@ -497,23 +476,13 @@ resource "google_cloud_run_v2_service" "n8n" {
         name  = "NODE_FUNCTION_ALLOW_BUILTIN"
         value = "*"
       }
-
       env {
-        name  = "ACTUAL_SERVER_URL"
-        value = "https://budget.tifan.me"
+        name  = "ACTUAL_PASSWORD"
+        value = var.actual_password
       }
       env {
-        name  = "ACTUAL_SYNC_ID"
-        value = "278a95d3-2467-4941-8125-24765283a859"
-      }
-      env {
-        name = "ACTUAL_PASSWORD"
-        value_source {
-          secret_key_ref {
-            secret  = google_secret_manager_secret.actual_password_secret.secret_id
-            version = "latest"
-          }
-        }
+        name  = "NODE_OPTIONS"
+        value = "--env-file=/home/node/.env"
       }
 
       # Disable diagnostics
@@ -590,7 +559,6 @@ resource "google_cloud_run_v2_service" "n8n" {
 
   depends_on = [
     google_project_service.run,
-    google_secret_manager_secret_iam_member.actual_password_secret_accessor,
     google_secret_manager_secret_iam_member.db_password_secret_accessor,
     google_secret_manager_secret_iam_member.encryption_key_secret_accessor,
     google_secret_manager_secret_iam_member.license_activation_key_secret_accessor
