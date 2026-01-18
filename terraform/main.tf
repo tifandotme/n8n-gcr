@@ -134,18 +134,18 @@ resource "google_pubsub_subscription" "n8n_push_subscription" {
   depends_on = [google_pubsub_topic.n8n_gmail_notifications]
 }
 
-resource "google_pubsub_subscription" "n8n_push_subscription_test" {
-  name  = "n8n-push-subscription-test"
-  topic = google_pubsub_topic.n8n_gmail_notifications.name
-
-  push_config {
-    push_endpoint = "https://${local.domain}/webhook-test/gmail-event?key=${var.webhook_auth_key}"
-  }
-
-  project = var.project_id
-
-  depends_on = [google_pubsub_topic.n8n_gmail_notifications]
-}
+# resource "google_pubsub_subscription" "n8n_push_subscription_test" {
+#   name  = "n8n-push-subscription-test"
+#   topic = google_pubsub_topic.n8n_gmail_notifications.name
+#
+#   push_config {
+#     push_endpoint = "https://${local.domain}/webhook-test/gmail-event?key=${var.webhook_auth_key}"
+#   }
+#
+#   project = var.project_id
+#
+#   depends_on = [google_pubsub_topic.n8n_gmail_notifications]
+# }
 
 # SECRETS
 
@@ -372,8 +372,9 @@ resource "google_cloud_run_v2_service" "n8n" {
       }
       resources {
         limits = {
-          cpu    = "1"
-          memory = "512Mi"
+          cpu = "1"
+          # memory = "512Mi"
+          memory = "1Gi"
         }
         startup_cpu_boost = true
         cpu_idle          = false # This is --no-cpu-throttling
