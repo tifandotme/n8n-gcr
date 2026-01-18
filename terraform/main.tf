@@ -476,10 +476,7 @@ resource "google_cloud_run_v2_service" "n8n" {
         name  = "NODE_FUNCTION_ALLOW_BUILTIN"
         value = "*"
       }
-      env {
-        name  = "NODE_OPTIONS"
-        value = "--env-file=/home/node/.env"
-      }
+
       # Disable diagnostics
       env {
         name  = "N8N_DIAGNOSTICS_ENABLED"

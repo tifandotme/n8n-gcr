@@ -3,10 +3,9 @@ FROM docker.n8n.io/n8nio/n8n:${N8N_VERSION}
 
 ARG ACTUAL_PASSWORD=""
 
-# Create .env file
-RUN echo "ACTUAL_SERVER_URL=https://actual.tifan.me" > /home/node/.env && \
-    echo "ACTUAL_SYNC_ID=278a95d3-2467-4941-8125-24765283a859" >> /home/node/.env && \
-    echo "ACTUAL_PASSWORD=${ACTUAL_PASSWORD}" >> /home/node/.env
+ENV ACTUAL_SERVER_URL=https://actual.tifan.me
+ENV ACTUAL_SYNC_ID=278a95d3-2467-4941-8125-24765283a859
+ENV ACTUAL_PASSWORD=${ACTUAL_PASSWORD}
 
 # Copy the script and ensure it has proper permissions
 COPY startup.sh /
