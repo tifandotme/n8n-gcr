@@ -14,12 +14,6 @@ variable "db_password" {
   sensitive   = true
 }
 
-variable "actual_password" {
-  description = "Password for the Actual Budget server."
-  type        = string
-  sensitive   = true
-}
-
 variable "license_activation_key" {
   description = "Activation key for n8n license."
   type        = string

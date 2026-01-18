@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'N8N version tag (e.g., 1.45.0)'
+        description: "N8N version tag (e.g., 1.45.0)"
         required: true
-        default: 'latest'
+        default: "latest"
 
 jobs:
   build:
@@ -21,6 +21,8 @@ jobs:
 
       - id: sa-key
         run: echo "json=$(dotenvx get BASE64_ENCODED_SERVICE_ACCOUNT_JSON)" >> $GITHUB_OUTPUT
+      - id: get-password
+        run: echo "password=$(dotenvx get ACTUAL_PASSWORD)" >> $GITHUB_OUTPUT
       - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           credentials_json: ${{ steps.sa-key.outputs.json }}
@@ -41,6 +43,7 @@ jobs:
           platforms: linux/amd64
           build-args: |
             N8N_VERSION=${{ github.event.inputs.version }}
+            ACTUAL_PASSWORD=${{ steps.get-password.outputs.password }}
           tags: |
             ${{ env.TF_VAR_region }}-docker.pkg.dev/${{ env.TF_VAR_project_id }}/n8n-repo/n8n:${{ github.event.inputs.version }}
             ${{ env.TF_VAR_region }}-docker.pkg.dev/${{ env.TF_VAR_project_id }}/n8n-repo/n8n:latest

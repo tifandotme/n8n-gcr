@@ -477,8 +477,8 @@ resource "google_cloud_run_v2_service" "n8n" {
         value = "*"
       }
       env {
-        name  = "ACTUAL_PASSWORD"
-        value = var.actual_password
+        name  = "NODE_OPTIONS"
+        value = "env-file=/home/node/.env"
       }
       # Disable diagnostics
       env {
