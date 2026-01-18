@@ -202,7 +202,7 @@ resource "google_secret_manager_secret" "actual_password_secret" {
   replication {
     auto {}
   }
-  depends_on = [google_project_service.secretmanager]
+  depends_on = [google_project_service.secretmanager, google_project_iam_member.ci_sa_secret_admin]
 }
 
 resource "google_secret_manager_secret_version" "actual_password_secret_version" {
