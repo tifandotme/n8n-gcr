@@ -134,6 +134,19 @@ resource "google_pubsub_subscription" "n8n_push_subscription" {
   depends_on = [google_pubsub_topic.n8n_gmail_notifications]
 }
 
+resource "google_pubsub_subscription" "n8n_push_subscription_test" {
+  name  = "n8n-push-subscription-test"
+  topic = google_pubsub_topic.n8n_gmail_notifications.name
+
+  push_config {
+    push_endpoint = "https://${local.domain}/webhook-test/gmail-event?key=${var.webhook_auth_key}"
+  }
+
+  project = var.project_id
+
+  depends_on = [google_pubsub_topic.n8n_gmail_notifications]
+}
+
 # SECRETS
 
 resource "google_secret_manager_secret" "actual_password_secret" {
