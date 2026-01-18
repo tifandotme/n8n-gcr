@@ -54,6 +54,16 @@ resource "google_project_service" "artifactregistry" {
   disable_on_destroy = true
 }
 
+resource "google_project_service" "gmail" {
+  service            = "gmail.googleapis.com"
+  disable_on_destroy = true
+}
+
+resource "google_project_service" "pubsub" {
+  service            = "pubsub.googleapis.com"
+  disable_on_destroy = true
+}
+
 # REGISTRY
 
 resource "google_artifact_registry_repository" "n8n_repo" {
@@ -94,6 +104,34 @@ resource "google_artifact_registry_repository" "n8n_repo" {
     }
   }
   depends_on = [google_project_service.artifactregistry]
+}
+
+# PUBSUB
+
+resource "google_pubsub_topic" "n8n_gmail_notifications" {
+  name       = "n8n-gmail-notifications"
+  project    = var.project_id
+  depends_on = [google_project_service.pubsub]
+}
+
+resource "google_pubsub_topic_iam_member" "gmail_push_publisher" {
+  topic   = google_pubsub_topic.n8n_gmail_notifications.name
+  role    = "roles/pubsub.publisher"
+  member  = "serviceAccount:gmail-api-push@system.gserviceaccount.com"
+  project = var.project_id
+}
+
+resource "google_pubsub_subscription" "n8n_push_subscription" {
+  name  = "n8n-push-subscription"
+  topic = google_pubsub_topic.n8n_gmail_notifications.name
+
+  push_config {
+    push_endpoint = "https://${local.domain}/webhook/gmail-event?key=${var.webhook_auth_key}"
+  }
+
+  project = var.project_id
+
+  depends_on = [google_pubsub_topic.n8n_gmail_notifications]
 }
 
 # SECRETS
@@ -272,6 +310,12 @@ resource "google_project_iam_member" "ci_sa_secret_version_manager" {
 resource "google_project_iam_member" "ci_sa_sa_key_admin" {
   project = var.project_id
   role    = "roles/iam.serviceAccountKeyAdmin"
+  member  = "serviceAccount:${google_service_account.ci_sa.email}"
+}
+
+resource "google_project_iam_member" "ci_sa_pubsub_admin" {
+  project = var.project_id
+  role    = "roles/pubsub.admin"
   member  = "serviceAccount:${google_service_account.ci_sa.email}"
 }
 
