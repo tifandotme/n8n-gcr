@@ -372,9 +372,9 @@ resource "google_cloud_run_v2_service" "n8n" {
       }
       resources {
         limits = {
-          cpu = "1"
-          # memory = "512Mi"
-          memory = "1Gi"
+          cpu    = "1"
+          memory = "512Mi"
+          # memory = "1Gi"
         }
         startup_cpu_boost = true
         cpu_idle          = false # This is --no-cpu-throttling
