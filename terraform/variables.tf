@@ -20,11 +20,7 @@ variable "license_activation_key" {
   sensitive   = true
 }
 
-variable "webhook_auth_key" {
-  description = "Auth key for Pub/Sub webhook endpoint."
-  type        = string
-  sensitive   = true
-}
+
 
 variable "actual_password" {
   description = "Password for Actual server."
