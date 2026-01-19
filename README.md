@@ -1,4 +1,4 @@
-# Maintenance Notes
+# n8n on Cloud Run
 
 ## Quick Facts
 
@@ -17,7 +17,6 @@
 7. URL: Check in GCP Console or visit https://<DOMAIN>
 8. Images: `gcloud artifacts docker images list --location=us-west1 --repository=n8n-repo --project <PROJECT>`
 9. DB Connect: `psql "postgresql://neondb_owner:<PASSWORD>@<NEON_HOST>/neondb?sslmode=require"`
-10. Terraform: `terraform plan`, `mise run check`
 
 ## Backups & Recovery (Neon)
 
@@ -26,37 +25,6 @@
 - Restore: Import to new Neon project/branch.
 - Test: Periodically verify restores.
 
-## Upgrading n8n
-
-1. Test locally, build/push with `docker buildx build --platform linux/amd64 -t us-west1-docker.pkg.dev/<PROJECT>/n8n-repo/n8n:<TAG> --push .`, deploy with `terraform apply` (pass to user).
-2. Monitor logs; rollback if needed (change image tag in TF, apply).
-
-## Building Custom Image
-
-- Manual: `docker buildx build --platform linux/amd64 -t us-west1-docker.pkg.dev/<PROJECT>/n8n-repo/n8n:<TAG> --push .`
-- Auth: `gcloud auth configure-docker $TF_VAR_region-docker.pkg.dev`
-
-## Terraform Workflow
-
-- Remote Backend: State stored in GCS bucket "n8n-terraform-state-bucket" with prefix "n8n".
-- Plan: `terraform plan`
-- Apply: `terraform apply` (never run apply/destroy directly; pass to user)
-- Validate: `mise run check`
-- Clean: `mise run terraform:clean`
-
-## Automation & CI/CD
-
-- Integrate GitHub Actions for auto-deploys: Push to main triggers `terraform apply`. State is remote, avoiding sync issues.
-- Alerts: Slack/webhooks for failures; test for false positives.
-
-## Scaling & Cost Control
-
-- Cloud Run: Adjust `cloud_run_max_instances`, CPU/memory.
-- Neon: Monitor free tier (100 hours/month); upgrade if exceeded.
-- Mise: Installs terraform.
-- Budget Alerts: Set up GCP Billing budgets with alerts for overruns; monitor egress costs. Use n8n workflows to query GCP Billing API for costs or trigger on Pub/Sub alerts.
-- Refer to `COSTS.md` for detailed cost analysis.
-
 ## Security Hardening
 
 - Least privilege on service accounts.
@@ -64,16 +32,6 @@
 - Diagnostics disabled: No telemetry sent to n8n servers.
 - Enforce settings file permissions, block env access in node (false), disable bare repos in git node.
 - Runners enabled with insecure mode for external modules.
-
-## Troubleshooting
-
-- Image not found: Check push/IAM; run `docker buildx build --platform linux/amd64 -t us-west1-docker.pkg.dev/<PROJECT>/n8n-repo/n8n:<TAG> --push .`. If Terraform apply fails with "Image '...' not found", run the build command then re-run `terraform apply`.
-- Crashes: Check logs, DB connectivity (ensure Neon active).
-- SSL errors: Verify `DB_POSTGRESDB_SSL=require`.
-- Compute exceeded: Upgrade Neon plan.
-- Cold starts: Cloud Scheduler wakes service.
-- Mise issues: `mise --version`; ensure tools installed.
-- Domain mapping: Ensure domain is mapped in Cloud Run.
 
 ## Disaster Recovery
 
